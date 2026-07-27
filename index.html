@@ -603,6 +603,39 @@
     cursor: pointer;
     width: 100%;
   }
+  .btn-guest {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-family: "Nunito Sans", sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text);
+    cursor: pointer;
+    margin-top: 12px;
+  }
+  .btn-guest svg { color: var(--muted); flex-shrink: 0; }
+  body.theme-dark .btn-guest { background-color: var(--card-bg) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .guest-banner {
+    max-width: 780px;
+    margin: 0 auto 18px;
+    padding: 12px 18px;
+    background: #fbeee0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: "Nunito Sans", sans-serif;
+    font-size: 0.85rem;
+    color: var(--text);
+    text-align: center;
+  }
+  .guest-banner strong { color: var(--accent-2); }
+  body.theme-dark .guest-banner { background-color: var(--card-bg) !important; color: var(--text) !important; border-color: var(--border) !important; }
   .back-link {
     display: inline-block;
     margin-bottom: 18px;
@@ -1760,6 +1793,10 @@
     <a href="#" class="btn" data-i18n="heroCta1" onclick="showView('view-signup'); return false;">Get started</a>
     <a href="#o-que-tem" class="btn secondary" data-i18n="heroCta2">See what's here</a>
   </div>
+  <button class="btn-guest" type="button" onclick="enterGuestMode()" style="max-width:320px; margin-left:auto; margin-right:auto;">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+  <span data-i18n="tryGuestLink">Try it without an account</span>
+</button>
   <p class="disclaimer" data-i18n="heroDisclaimer">This app does not replace medical, psychological, or nutritional care.</p>
   <svg class="flourish" width="120" height="30" viewBox="0 0 120 30" xmlns="http://www.w3.org/2000/svg" fill="none">
     <path d="M0,15 C25,15 30,5 45,5 C55,5 55,15 60,15 C65,15 65,5 75,5 C90,5 95,15 120,15" stroke="#a9612f" stroke-width="1.3"/>
@@ -1853,6 +1890,10 @@
       </form>
 
       <button class="switch-link" onclick="showView('view-signup')" data-i18n="noAccountYet">Don't have an account yet</button>
+      <button class="btn-guest" type="button" onclick="enterGuestMode()">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+  <span data-i18n="tryGuestLink">Try it without an account</span>
+</button>
 
 
       <div class="auth-disclaimer" data-i18n-html="authDisclaimer">
@@ -1906,6 +1947,7 @@
 
 <div class="view" id="view-dashboard">
   <button class="floating-help-btn" onclick="document.getElementById('help-modal').style.display='flex';" title="Help / Crisis resources">!</button>
+  <div class="guest-banner" id="guest-banner" style="display:none;" data-i18n-html="guestBannerText">You're browsing as a guest — your entries <strong>won't be saved</strong> once you close or refresh this page. <a href="#" onclick="showView('view-signup'); return false;" style="color:inherit; text-decoration:underline;">Create an account</a> to keep everything.</div>
   <div class="site-nav">
     <div class="dash-header">
       <div class="logo" onclick="showView('view-home')">AMARens</div>
@@ -2430,6 +2472,20 @@ let selectedMovements = [];
 let calMonthOffset = 0; // 0 = current month
 let currentLang = 'en';
 let currentTheme = '';
+let isGuest = false;
+let guestStore = {
+  journal: {},
+  movement: {},
+  reflections: {},
+  notebook: {},
+  nutritionProfile: null
+};
+
+async function enterGuestMode() {
+  isGuest = true;
+  currentUser = { id: null, email: null, name: t('guestName') };
+  await enterDashboard();
+}
 let lastLoveIndex = 0;
 
 function renderLoveBanner() {
@@ -2446,7 +2502,7 @@ function setTheme(theme) {
   currentTheme = theme;
   document.body.className = theme ? 'theme-' + theme : '';
   document.querySelectorAll('.theme-swatch').forEach(b => b.classList.toggle('selected', b.dataset.theme === theme));
-  if (currentUser) db.auth.updateUser({ data: { theme: theme } });
+  if (currentUser && !isGuest) db.auth.updateUser({ data: { theme: theme } });
 }
 
 /* ---------------- auth (demo-level, not secure) ---------------- */
@@ -2521,8 +2577,10 @@ async function doSignup() {
 }
 
 async function doLogout() {
-  await db.auth.signOut();
+  if (!isGuest) await db.auth.signOut();
+  isGuest = false;
   currentUser = null;
+  guestStore = { journal: {}, movement: {}, reflections: {}, notebook: {}, nutritionProfile: null };
   document.body.className = '';
   showView('view-home');
 }
@@ -2539,8 +2597,7 @@ async function editNickname() {
 
 async function openProfileModal() {
   if (!currentUser) return;
-  const { data } = await db.auth.getUser();
-  const meta = (data && data.user && data.user.user_metadata) || {};
+  const meta = isGuest ? {} : ((await db.auth.getUser()).data.user.user_metadata || {});
   document.getElementById('profile-nickname').value = currentUser.name || '';
   document.getElementById('profile-age').value = meta.age || '';
   document.getElementById('profile-sign').value = meta.zodiac || '';
@@ -2560,8 +2617,10 @@ async function saveProfile() {
   const age = document.getElementById('profile-age').value;
   const zodiac = document.getElementById('profile-sign').value;
 
-  const { error } = await db.auth.updateUser({ data: { name: name, age: age, zodiac: zodiac } });
-  if (error) { alert(error.message); return; }
+  if (!isGuest) {
+    const { error } = await db.auth.updateUser({ data: { name: name, age: age, zodiac: zodiac } });
+    if (error) { alert(error.message); return; }
+  }
 
   currentUser.name = name;
   document.getElementById('dash-username').textContent = t('greeting') + ', ' + currentUser.name + '!';
@@ -2573,10 +2632,16 @@ async function saveProfile() {
 }
 
 async function enterDashboard() {
-  const { data: udata } = await db.auth.getUser();
-  const savedTheme = (udata && udata.user && udata.user.user_metadata && udata.user.user_metadata.theme) || '';
-  currentTheme = savedTheme;
-  document.body.className = savedTheme ? 'theme-' + savedTheme : '';
+  document.getElementById('guest-banner').style.display = isGuest ? 'block' : 'none';
+
+  if (!isGuest) {
+    const { data: udata } = await db.auth.getUser();
+    const savedTheme = (udata && udata.user && udata.user.user_metadata && udata.user.user_metadata.theme) || '';
+    currentTheme = savedTheme;
+    document.body.className = savedTheme ? 'theme-' + savedTheme : '';
+  } else {
+    document.body.className = currentTheme ? 'theme-' + currentTheme : '';
+  }
 
   const greetings = t('warmGreetings').split('|');
   const greet = greetings[Math.floor(Math.random() * greetings.length)];
@@ -2752,8 +2817,8 @@ let reflectionDate = null;
 async function loadManualReflections(dateStr) {
   if (!currentUser) return;
   reflectionDate = dateStr || todayKey();
-  const { data } = await db.from('manual_reflections')
-    .select('*').eq('user_id', currentUser.id).eq('entry_date', reflectionDate).maybeSingle();
+  const data = isGuest ? (guestStore.reflections[reflectionDate] || null) : (await db.from('manual_reflections')
+    .select('*').eq('user_id', currentUser.id).eq('entry_date', reflectionDate).maybeSingle()).data;
   document.getElementById('manual-r1').value = data ? (data.r1 || '') : '';
   document.getElementById('manual-r2').value = data ? (data.r2 || '') : '';
   document.getElementById('manual-r3').value = data ? (data.r3 || '') : '';
@@ -2788,8 +2853,12 @@ async function saveManualReflections() {
     r2: document.getElementById('manual-r2').value,
     r3: document.getElementById('manual-r3').value
   };
-  const { error } = await db.from('manual_reflections').upsert(row, { onConflict: 'user_id,entry_date' });
-  if (error) { console.error(error); alert(error.message); return; }
+  if (isGuest) {
+    guestStore.reflections[dateToSave] = row;
+  } else {
+    const { error } = await db.from('manual_reflections').upsert(row, { onConflict: 'user_id,entry_date' });
+    if (error) { console.error(error); alert(error.message); return; }
+  }
   document.getElementById('manual-saved-msg').textContent = t('savedCheck');
   setTimeout(() => { document.getElementById('manual-saved-msg').textContent = ''; }, 2500);
   loadReflectionsList();
@@ -2799,9 +2868,9 @@ async function loadReflectionsList() {
   if (!currentUser) return;
   const box = document.getElementById('reflections-list');
   if (!box) return;
-  const { data } = await db.from('manual_reflections')
+  const data = isGuest ? Object.values(guestStore.reflections).sort((a, b) => b.entry_date.localeCompare(a.entry_date)) : (await db.from('manual_reflections')
     .select('*').eq('user_id', currentUser.id)
-    .order('entry_date', { ascending: false }).limit(30);
+    .order('entry_date', { ascending: false }).limit(30)).data;
   box.innerHTML = '';
   if (!data || data.length === 0) {
     box.innerHTML = '<p class="muted-p">' + t('noReflectionsYet') + '</p>';
@@ -2861,8 +2930,8 @@ let dailyDate = null;
 async function loadDailyEntry(dateStr) {
   if (!currentUser) return;
   dailyDate = dateStr || todayKey();
-  const { data } = await db.from('notebook_entries')
-    .select('*').eq('user_id', currentUser.id).eq('entry_date', dailyDate).eq('kind', 'daily').maybeSingle();
+  const data = isGuest ? (guestStore.notebook[dailyDate + '|daily'] || null) : (await db.from('notebook_entries')
+    .select('*').eq('user_id', currentUser.id).eq('entry_date', dailyDate).eq('kind', 'daily').maybeSingle()).data;
   document.getElementById('daily-gratitude').value = data ? (data.gratitude || '') : '';
   document.getElementById('daily-dpmi').value = data ? (data.dpmi || '') : '';
   document.getElementById('daily-actions').value = data ? (data.actions_procrastination || '') : '';
@@ -2874,8 +2943,8 @@ async function loadDailyEntry(dateStr) {
 async function loadNotebookEntry(dateStr) {
   if (!currentUser) return;
   notebookDate = dateStr || todayKey();
-  const { data } = await db.from('notebook_entries')
-    .select('*').eq('user_id', currentUser.id).eq('entry_date', notebookDate).eq('kind', 'notebook').maybeSingle();
+  const data = isGuest ? (guestStore.notebook[notebookDate + '|notebook'] || null) : (await db.from('notebook_entries')
+    .select('*').eq('user_id', currentUser.id).eq('entry_date', notebookDate).eq('kind', 'notebook').maybeSingle()).data;
   document.getElementById('nb-gratitude').value = data ? (data.gratitude || '') : '';
   document.getElementById('nb-desire').value = data ? (data.desire_decision || '') : '';
   document.getElementById('nb-actions').value = data ? (data.actions_procrastination || '') : '';
@@ -2883,8 +2952,8 @@ async function loadNotebookEntry(dateStr) {
   document.getElementById('nb-values').value = data ? (data.values_practice || '') : '';
   document.getElementById('nb-learnings').value = data ? (data.learnings || '') : '';
 
-  const { data: dailyData } = await db.from('notebook_entries')
-    .select('*').eq('user_id', currentUser.id).eq('entry_date', todayKey()).eq('kind', 'daily').maybeSingle();
+  const dailyData = isGuest ? (guestStore.notebook[todayKey() + '|daily'] || null) : (await db.from('notebook_entries')
+    .select('*').eq('user_id', currentUser.id).eq('entry_date', todayKey()).eq('kind', 'daily').maybeSingle()).data;
   document.getElementById('daily-gratitude').value = dailyData ? (dailyData.gratitude || '') : '';
   document.getElementById('daily-dpmi').value = dailyData ? (dailyData.dpmi || '') : '';
   document.getElementById('daily-actions').value = dailyData ? (dailyData.actions_procrastination || '') : '';
@@ -2936,8 +3005,12 @@ async function saveNotebookEntry(kind) {
       actions_procrastination: document.getElementById('daily-actions').value
     };
   }
-  const { error } = await db.from('notebook_entries').upsert(row, { onConflict: 'user_id,entry_date,kind' });
-  if (error) { console.error(error); alert(error.message); return; }
+  if (isGuest) {
+    guestStore.notebook[row.entry_date + '|' + row.kind] = row;
+  } else {
+    const { error } = await db.from('notebook_entries').upsert(row, { onConflict: 'user_id,entry_date,kind' });
+    if (error) { console.error(error); alert(error.message); return; }
+  }
   const msgId = kind === 'notebook' ? 'notebook-saved-msg' : 'daily-saved-msg';
   document.getElementById(msgId).textContent = t('savedCheck');
   setTimeout(() => { document.getElementById(msgId).textContent = ''; }, 2500);
@@ -2948,9 +3021,9 @@ async function loadNotebookList() {
   if (!currentUser) return;
   const box = document.getElementById('notebook-list');
   if (!box) return;
-  const { data } = await db.from('notebook_entries')
+  const data = isGuest ? Object.values(guestStore.notebook).sort((a, b) => b.entry_date.localeCompare(a.entry_date)) : (await db.from('notebook_entries')
     .select('*').eq('user_id', currentUser.id)
-    .order('entry_date', { ascending: false }).limit(40);
+    .order('entry_date', { ascending: false }).limit(40)).data;
   box.innerHTML = '';
   if (!data || data.length === 0) {
     box.innerHTML = '<p class="muted-p">' + t('noNotebooksYet') + '</p>';
@@ -3125,8 +3198,8 @@ async function loadJournalEntry(dateStr) {
   editingDate = dateStr;
   const datePicker = document.getElementById('journal-date-picker');
   if (datePicker) datePicker.value = dateStr;
-  const { data: entry } = await db.from('journal_entries')
-    .select('*').eq('user_id', currentUser.id).eq('entry_date', dateStr).maybeSingle();
+  const entry = isGuest ? (guestStore.journal[dateStr] || null) : (await db.from('journal_entries')
+    .select('*').eq('user_id', currentUser.id).eq('entry_date', dateStr).maybeSingle()).data;
   attachedPhotos = [];
   document.getElementById('journal-title').value = '';
   if (entry) {
@@ -3160,8 +3233,8 @@ async function loadJournalEntry(dateStr) {
 async function viewJournalEntry(dateStr) {
   if (!currentUser) return;
   lastViewedDate = dateStr;
-  const { data: entry } = await db.from('journal_entries')
-    .select('*').eq('user_id', currentUser.id).eq('entry_date', dateStr).maybeSingle();
+  const entry = isGuest ? (guestStore.journal[dateStr] || null) : (await db.from('journal_entries')
+    .select('*').eq('user_id', currentUser.id).eq('entry_date', dateStr).maybeSingle()).data;
 
   const locale = currentLang === 'pt' ? 'pt-BR' : 'en-US';
   const dateObj = new Date(dateStr + 'T00:00:00');
@@ -3250,11 +3323,16 @@ async function loadEntriesList(searchTerm) {
   if (!currentUser) return;
   const box = document.getElementById('entries-list');
   if (!box) return;
-  const { data } = await db.from('journal_entries')
-    .select('*').eq('user_id', currentUser.id)
-    .order('entry_date', { ascending: false }).limit(100);
+  let entries;
+  if (isGuest) {
+    entries = Object.values(guestStore.journal).sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+  } else {
+    const { data } = await db.from('journal_entries')
+      .select('*').eq('user_id', currentUser.id)
+      .order('entry_date', { ascending: false }).limit(100);
+    entries = data || [];
+  }
 
-  let entries = data || [];
   const term = (searchTerm || '').trim().toLowerCase();
   if (term) {
     entries = entries.filter(e =>
@@ -3441,8 +3519,12 @@ async function saveJournal() {
     photos: attachedPhotos,
     stickers: placedStickers
   };
-  const { error } = await db.from('journal_entries').upsert(row, { onConflict: 'user_id,entry_date' });
-  if (error) { console.error(error); alert(error.message); return; }
+  if (isGuest) {
+    guestStore.journal[dateToSave] = row;
+  } else {
+    const { error } = await db.from('journal_entries').upsert(row, { onConflict: 'user_id,entry_date' });
+    if (error) { console.error(error); alert(error.message); return; }
+  }
   document.getElementById('journal-saved-msg').textContent = t('savedCheck');
   setTimeout(() => { document.getElementById('journal-saved-msg').textContent = ''; }, 2500);
   renderCalendar();
@@ -3473,12 +3555,20 @@ async function renderCalendar() {
   const firstStr = year + '-' + String(month+1).padStart(2,'0') + '-01';
   const lastStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(daysInMonth).padStart(2,'0');
 
-  const [{ data: entries }, { data: movements }] = await Promise.all([
-    db.from('journal_entries').select('*').eq('user_id', currentUser.id).gte('entry_date', firstStr).lte('entry_date', lastStr),
-    db.from('movement_logs').select('*').eq('user_id', currentUser.id).gte('log_date', firstStr).lte('log_date', lastStr)
-  ]);
-  const entryMap = {}; (entries || []).forEach(e => entryMap[e.entry_date] = e);
-  const moveMap = {}; (movements || []).forEach(m => moveMap[m.log_date] = m);
+  let entries, movements;
+  if (isGuest) {
+    entries = Object.values(guestStore.journal).filter(e => e.entry_date >= firstStr && e.entry_date <= lastStr);
+    movements = Object.entries(guestStore.movement).filter(([d]) => d >= firstStr && d <= lastStr).map(([d, m]) => ({ ...m, log_date: d }));
+  } else {
+    const [{ data: e1 }, { data: e2 }] = await Promise.all([
+      db.from('journal_entries').select('*').eq('user_id', currentUser.id).gte('entry_date', firstStr).lte('entry_date', lastStr),
+      db.from('movement_logs').select('*').eq('user_id', currentUser.id).gte('log_date', firstStr).lte('log_date', lastStr)
+    ]);
+    entries = e1 || [];
+    movements = e2 || [];
+  }
+  const entryMap = {}; entries.forEach(e => entryMap[e.entry_date] = e);
+  const moveMap = {}; movements.forEach(m => moveMap[m.log_date] = m);
 
   const grid = document.getElementById('calendar-grid');
   grid.innerHTML = '';
@@ -3532,14 +3622,13 @@ function showDayOptions(dateStr, entry, movement) {
   box.innerHTML = html;
 }
 
-function viewMovementDay(dateStr) {
+async function viewMovementDay(dateStr) {
   const box = document.getElementById('cal-entry-preview');
-  db.from('movement_logs').select('*').eq('user_id', currentUser.id).eq('log_date', dateStr).maybeSingle().then(({ data: m }) => {
-    if (!m) return;
-    const moveNames = { 'Yoga': t('actYoga'), 'Pilates': t('actPilates'), 'Walk': t('actWalk'), 'Stretching': t('actStretching'), 'Dance': t('actDance'), 'Rest day': t('actRest') };
-    const names = (m.activities || []).map(a => moveNames[a] || a).join(', ');
-    box.innerHTML = '<div class="movement-day-view"><strong>' + names + '</strong>' + (m.note ? '<p>' + escapeHTML(m.note) + '</p>' : '') + '</div>';
-  });
+  const m = isGuest ? (guestStore.movement[dateStr] || null) : (await db.from('movement_logs').select('*').eq('user_id', currentUser.id).eq('log_date', dateStr).maybeSingle()).data;
+  if (!m) return;
+  const moveNames = { 'Yoga': t('actYoga'), 'Pilates': t('actPilates'), 'Walk': t('actWalk'), 'Stretching': t('actStretching'), 'Dance': t('actDance'), 'Rest day': t('actRest') };
+  const names = (m.activities || []).map(a => moveNames[a] || a).join(', ');
+  box.innerHTML = '<div class="movement-day-view"><strong>' + names + '</strong>' + (m.note ? '<p>' + escapeHTML(m.note) + '</p>' : '') + '</div>';
 }
 
 async function callAI(system, messages, maxTokens) {
@@ -3564,8 +3653,12 @@ async function callAI(system, messages, maxTokens) {
 
 async function loadChatHistory() {
   if (!currentUser) return;
-  const { data } = await db.from('chat_messages').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: true });
-  chatHistory = (data || []).map(m => ({ role: m.role, content: m.content }));
+  if (!isGuest) {
+    const { data } = await db.from('chat_messages').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: true });
+    chatHistory = (data || []).map(m => ({ role: m.role, content: m.content }));
+  } else {
+    chatHistory = [];
+  }
   const box = document.getElementById('chat-box');
   box.innerHTML = '';
   if (chatHistory.length === 0) {
@@ -3635,7 +3728,7 @@ async function sendChat() {
   input.value = '';
   appendBubble('me', text);
   chatHistory.push({ role: 'user', content: text });
-  await db.from('chat_messages').insert({ user_id: currentUser.id, role: 'user', content: text });
+  if (!isGuest) await db.from('chat_messages').insert({ user_id: currentUser.id, role: 'user', content: text });
 
   const thinkingId = 'thinking-' + Date.now();
   const box = document.getElementById('chat-box');
@@ -3652,7 +3745,7 @@ async function sendChat() {
     document.getElementById(thinkingId).remove();
     appendBubble('ai', reply);
     chatHistory.push({ role: 'assistant', content: reply });
-    await db.from('chat_messages').insert({ user_id: currentUser.id, role: 'assistant', content: reply });
+    if (!isGuest) await db.from('chat_messages').insert({ user_id: currentUser.id, role: 'assistant', content: reply });
   } catch(e) {
     document.getElementById(thinkingId).remove();
     appendBubble('ai', t('chatErrorMsg'));
@@ -3669,7 +3762,7 @@ async function generateMealIdeas() {
   const restrictions = document.getElementById('nut-restrictions').value.trim() || 'none specified';
   const diet = document.getElementById('nut-diet').value;
   const budget = document.getElementById('nut-budget').value;
-  if (currentUser) {
+  if (currentUser && !isGuest) {
     await db.from('nutrition_profiles').upsert({ user_id: currentUser.id, restrictions, diet, budget });
   }
   const ideasBox = document.getElementById('meal-ideas');
@@ -3747,8 +3840,8 @@ async function sendNutriChat() {
 /* ---------------- movement ---------------- */
 async function loadTodayMovement() {
   if (!currentUser) return;
-  const { data: m } = await db.from('movement_logs')
-    .select('*').eq('user_id', currentUser.id).eq('log_date', todayKey()).maybeSingle();
+  const m = isGuest ? (guestStore.movement[todayKey()] || null) : (await db.from('movement_logs')
+    .select('*').eq('user_id', currentUser.id).eq('log_date', todayKey()).maybeSingle()).data;
   document.querySelectorAll('.movement-chip').forEach(b => b.classList.remove('selected'));
   if (m && m.activities && m.activities.length) {
     selectedMovements = m.activities.slice();
@@ -3767,8 +3860,12 @@ async function saveMovement() {
   if (!currentUser) return;
   const note = document.getElementById('movement-note').value;
   if (!selectedMovements.length) { alert(t('pickActivityAlert')); return; }
-  const { error } = await db.from('movement_logs').upsert({ user_id: currentUser.id, log_date: todayKey(), activities: selectedMovements, note }, { onConflict: 'user_id,log_date' });
-  if (error) { console.error(error); alert(error.message); return; }
+  if (isGuest) {
+    guestStore.movement[todayKey()] = { activities: selectedMovements, note };
+  } else {
+    const { error } = await db.from('movement_logs').upsert({ user_id: currentUser.id, log_date: todayKey(), activities: selectedMovements, note }, { onConflict: 'user_id,log_date' });
+    if (error) { console.error(error); alert(error.message); return; }
+  }
 
   const cheer = t('movementCheers').split('|');
   document.getElementById('movement-saved-msg').textContent = cheer[Math.floor(Math.random() * cheer.length)];
@@ -4103,6 +4200,9 @@ const translations = {
     voice11: "🇺🇸 @i_weigh — body-image & mental health community",
     voice12: "🇧🇷 @saudesemgordofobia — non-fatphobic healthcare professionals",
     loginWrongCreds: "That email and password don't match. Double-check them, or tap \"Don't have an account yet\" if you haven't signed up.",
+    tryGuestLink: "Try it without an account",
+    guestBannerText: "You're browsing as a guest — your entries <strong>won't be saved</strong> once you close or refresh this page. <a href=\"#\" onclick=\"showView('view-signup'); return false;\" style=\"color:inherit; text-decoration:underline;\">Create an account</a> to keep everything.",
+    guestName: "Guest",
     moduleM5: "M5 · The Notebook",
     m5Title: "The Notebook & the Daily",
     m5Credit: "Inspired by <strong>@thaaisfeijao</strong>'s \"caderninho\" (notebook) and \"daily\" practice, adapted here for noticing patterns around body, food, and self-worth.",
@@ -4342,6 +4442,9 @@ const translations = {
     voice11: "🇺🇸 @i_weigh — comunidade sobre imagem corporal e saúde mental",
     voice12: "🇧🇷 @saudesemgordofobia — profissionais de saúde não-gordofóbicos",
     loginWrongCreds: "Esse e-mail e senha não combinam. Confere de novo, ou toca em \"Ainda não tenho conta\" se você não chegou a se cadastrar.",
+    tryGuestLink: "Experimentar sem conta",
+    guestBannerText: "Você está navegando como convidada — suas entradas <strong>não serão salvas</strong> quando você fechar ou atualizar essa página. <a href=\"#\" onclick=\"showView('view-signup'); return false;\" style=\"color:inherit; text-decoration:underline;\">Crie uma conta</a> pra guardar tudo.",
+    guestName: "Convidada",
     moduleM5: "M5 · O Caderninho",
     m5Title: "O Caderninho e o Daily",
     m5Credit: "Inspirado no \"caderninho\" e no \"daily\" da <strong>@thaaisfeijao</strong>, adaptado aqui pra perceber padrões em torno do corpo, da comida e da autoestima.",
